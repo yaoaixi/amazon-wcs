@@ -10,7 +10,7 @@ class RedisCluster:
 
     def __init__(self):
         try:
-            self.rc = StrictRedisCluster(startup_nodes=StartupNodesServer, decode_responses=True)
+            self.rc = StrictRedisCluster(startup_nodes=StartupNodesServer, password='bgpc1qaz@WSX', decode_responses=True)
         except:
             traceback.print_exc()
 
@@ -100,8 +100,8 @@ class RedisCluster:
 class AmazonStorePro:
     def __init__(self):
         try:
-            self.conn = pymysql.connect(**MYSQL_CONFIG_LOCAL)
-            #self.conn = pymysql.connect(**MYSQL_CONFIG_SERVER)
+            #self.conn = pymysql.connect(**MYSQL_CONFIG_LOCAL)
+            self.conn = pymysql.connect(**MYSQL_CONFIG_SERVER)
         except:
             traceback.print_exc()
             sys.exit()

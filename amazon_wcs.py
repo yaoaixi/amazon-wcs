@@ -5,14 +5,14 @@ import asyncio
 from threading import Thread
 import aiohttp
 from aiohttp.client_exceptions import ClientError
-from configuration_file import ConcurrentNum, TimeOut, StartUrls, ReqUrls, CrawlUrls, OneTask
-from store import RedisCluster, AmazonStore
+from configuration_file import ConcurrentNum, TimeOut, StartUrls, ReqUrls, CrawlUrls, OneTask, RemainNum, UserEmail, TopRank
+from store import RedisCluster
 from settings import HEADERS
-from parse_html import exist_captcha, collect_error, choose_parse
-from scan_task import scan_database, change_status, get_last_id, Que, update_proxy_ip
+from parse_html_func import exist_captcha, choose_parse
+from scan_task import scan_database, change_status, Que, update_proxy_ip
+from get_user_mail import get_mail_addr
 
 RedisA = RedisCluster()
-store = AmazonStore()
 
 
 def start_loop(loop):
@@ -51,11 +51,17 @@ async def req_http(mp):
                     # collect_error(mp, RedisA, error='404')
                     if not category_entry:
                         if RedisA.exists_key(OneTask):
-                            task_id = RedisA.get_hash_field(OneTask, 'task_id')
-                            if isinstance(task_id, bytes):
-                                task_id = task_id.decode('utf-8')
-                            change_status(-1, int(task_id))
-                            RedisA.delete_key(OneTask)
+                            task_num = RedisA.get_hash_field(OneTask, 'task_num')
+                            task_num = int(task_num) - 1
+                            print('task_num', task_num)
+                            if task_num == 0:
+                                task_id = RedisA.get_hash_field(OneTask, 'task_id')
+                                if isinstance(task_id, bytes):
+                                    task_id = task_id.decode('utf-8')
+                                change_status(-1, '404', int(task_id))
+                                RedisA.delete_key(OneTask)
+                            else:
+                                RedisA.set_hash(OneTask, {'task_num': task_num})
                 else:
                     proxy_ip['num'] -= 1
                     print(resp.status)
@@ -78,6 +84,7 @@ async def req_http(mp):
 
 
 if __name__ == '__main__':
+
     new_loop = asyncio.new_event_loop()
     thread = Thread(target=start_loop, args=(new_loop,))
     thread.setDaemon(True)
@@ -92,7 +99,7 @@ if __name__ == '__main__':
     flag = True
     try:
         while flag:
-            if Que.qsize() < 5:
+            if Que.qsize() < RemainNum:
                 update_proxy_ip(Que)
 
             if RedisA.count_members(CrawlUrls) < ConcurrentNum:
@@ -110,20 +117,26 @@ if __name__ == '__main__':
                 RedisA.add_set(CrawlUrls, item)
                 asyncio.run_coroutine_threadsafe(req_http(item), new_loop)
             # 队列都为空，采集完成
-            if not (RedisA.exists_key(CrawlUrls) or RedisA.exists_key(ReqUrls) or RedisA.exists_key(StartUrls)):
+            if not RedisA.exists_key(CrawlUrls) and not RedisA.exists_key(ReqUrls) and not RedisA.exists_key(StartUrls):
+                RedisA.delete_key(TopRank)
                 if RedisA.exists_key(OneTask):
                     is_track = RedisA.get_hash_field(OneTask, 'is_track')
                     task_id = RedisA.get_hash_field(OneTask, 'task_id')
+                    user_id = RedisA.get_hash_field(OneTask, 'user_id')
                     if isinstance(is_track, bytes):
                         is_track = is_track.decode('utf-8')
                         task_id = task_id.decode('utf-8')
+                        user_id = user_id.decode('utf-8')
                     if int(is_track) == 0:
                         time.sleep(20)
-                        change_status(2, int(task_id))
+                        change_status(2, '', int(task_id))
+                    # 发送邮件
+                    mail_addr = get_mail_addr(user_id)
+                    if mail_addr:
+                        print(mail_addr)
+                        RedisA.rc.rpush(UserEmail, mail_addr)
                     RedisA.delete_key(OneTask)
-                    #get_last_id('crawler_amazon_sku')
                 scan_database()
     except KeyboardInterrupt:
         print('KeyboardInterrupt')
         new_loop.stop()
-        store.close()

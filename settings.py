@@ -2,7 +2,7 @@
 import pymysql
 
 MYSQL_CONFIG_SERVER = {
-    'host': '47.90.32.89',  # 10.28.178.68
+    'host': '47.90.73.156',
     'port': 3306,
     'user': 'bgpc',
     'passwd': 'bgpc1qaz@WSX',
@@ -20,7 +20,7 @@ MYSQL_CONFIG_LOCAL = {
     'cursorclass': pymysql.cursors.DictCursor
     }
 
-StartupNodesServer = [{"host": "10.28.178.68", "port": "7000"}]
+StartupNodesServer = [{"host": "10.28.201.120", "port": "6379"}]
 StartupNodesLocal = [{"host": "47.91.140.136", "port": "7000"}]
 
 HEADERS=['Mozilla/4.0 (compatible; MSIE 5.0; Windows 3.1; Trident/7.0; rv:11.0) like Gecko',
